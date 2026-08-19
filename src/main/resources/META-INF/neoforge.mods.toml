@@ -1,0 +1,38 @@
+modLoader = "javafml"
+loaderVersion = "${loader_version_range}"
+license = "GPL-3.0-or-later"
+
+[[mods]]
+modId = "${mod_id}"
+version = "${mod_version}"
+displayName = "${mod_name}"
+authors = "JNizio"
+description = '''A Lion King II-inspired story and character expansion for Circle of Craft.'''
+
+[[dependencies.prideslegacy]]
+modId = "neoforge"
+type = "required"
+versionRange = "${neo_version_range}"
+ordering = "NONE"
+side = "BOTH"
+
+[[dependencies.prideslegacy]]
+modId = "minecraft"
+type = "required"
+versionRange = "${minecraft_version_range}"
+ordering = "NONE"
+side = "BOTH"
+
+[[dependencies.prideslegacy]]
+modId = "circleofcraft"
+type = "required"
+versionRange = "[0.3.0,)"
+ordering = "AFTER"
+side = "BOTH"
+
+[[dependencies.prideslegacy]]
+modId = "geckolib"
+type = "required"
+versionRange = "[4.8,)"
+ordering = "AFTER"
+side = "BOTH"
