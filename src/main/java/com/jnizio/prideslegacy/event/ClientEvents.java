@@ -1,10 +1,10 @@
 package com.jnizio.prideslegacy.event;
 
 import com.jnizio.prideslegacy.PridesLegacyMod;
+import com.jnizio.prideslegacy.client.model.KovuModelLayers;
+import com.jnizio.prideslegacy.client.renderer.KovuRenderer;
 import com.jnizio.prideslegacy.registry.ModEntityTypes;
 import io.github.ron1196.circleofcraft.client.model.LionModel;
-import io.github.ron1196.circleofcraft.client.renderer.AnimalRenderer;
-import io.github.ron1196.circleofcraft.entity.animal.LionEntity;
 import net.minecraft.client.model.geom.ModelLayerLocation;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
@@ -21,18 +21,13 @@ public final class ClientEvents {
 
     @SubscribeEvent
     public static void registerLayerDefinitions(EntityRenderersEvent.RegisterLayerDefinitions event) {
-        event.registerLayerDefinition(KOVU_LAYER, LionModel::createBodyLayer);
+        event.registerLayerDefinition(KOVU_LAYER, KovuModelLayers::createBodyLayer);
     }
 
     @SubscribeEvent
     public static void registerRenderers(EntityRenderersEvent.RegisterRenderers event) {
         event.registerEntityRenderer(
                 ModEntityTypes.KOVU.get(),
-                ctx -> new AnimalRenderer<>(
-                        ctx,
-                        new LionModel<>(ctx.bakeLayer(KOVU_LAYER)),
-                        "scar",
-                        0.7F,
-                        LionEntity.BABY_SCALE));
+                ctx -> new KovuRenderer(ctx, new LionModel<>(ctx.bakeLayer(KOVU_LAYER))));
     }
 }

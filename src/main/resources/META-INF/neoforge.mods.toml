@@ -9,6 +9,9 @@ displayName = "${mod_name}"
 authors = "JNizio"
 description = '''A Lion King II-inspired story and character expansion for Circle of Craft.'''
 
+[[mixins]]
+config = "prideslegacy.mixins.json"
+
 [[dependencies.prideslegacy]]
 modId = "neoforge"
 type = "required"
