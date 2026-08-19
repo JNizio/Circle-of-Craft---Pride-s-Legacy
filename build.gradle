@@ -65,3 +65,171 @@ tasks.withType(ProcessResources).configureEach {
 tasks.withType(JavaCompile).configureEach {
     options.encoding = 'UTF-8'
 }
+
+// -----------------------------------------------------------------------------
+// Kovu texture generation
+// -----------------------------------------------------------------------------
+// Pride's Legacy keeps Kovu visually compatible with Circle of Craft without modifying any
+// Circle of Craft resource at runtime. During the build we use Scar's pixel-art texture as a
+// detail/luminance reference, recolour it into Kovu's palette, then paint the UV islands used by
+// Kovu's new ears and tail. The resulting PNG is baked into Pride's Legacy's jar.
+def generatedKovuResources = layout.buildDirectory.dir('generated/prideslegacyResources')
+def generatedKovuTexture = generatedKovuResources.map {
+    it.file('assets/prideslegacy/textures/entity/kovu.png')
+}
+
+tasks.register('generateKovuTexture') {
+    inputs.file(file('libs/circleofcraft.jar'))
+    outputs.file(generatedKovuTexture)
+
+    doLast {
+        def outputFile = generatedKovuTexture.get().asFile
+        outputFile.parentFile.mkdirs()
+
+        def zip = new java.util.zip.ZipFile(file('libs/circleofcraft.jar'))
+        try {
+            def entry = zip.getEntry('assets/circleofcraft/textures/entity/scar.png')
+            if (entry == null) {
+                throw new GradleException('Circle of Craft scar.png not found; cannot generate Kovu texture')
+            }
+
+            def source = javax.imageio.ImageIO.read(zip.getInputStream(entry))
+            if (source == null || source.width != 64 || source.height != 96) {
+                throw new GradleException("Unexpected Circle of Craft Scar texture size: ${source?.width}x${source?.height}")
+            }
+
+            def image = new java.awt.image.BufferedImage(64, 96, java.awt.image.BufferedImage.TYPE_INT_ARGB)
+            def clampChannel = { int value -> Math.max(0, Math.min(255, value)) }
+            def rgb = { int r, int g, int b, int a ->
+                ((a & 0xff) << 24) | ((r & 0xff) << 16) | ((g & 0xff) << 8) | (b & 0xff)
+            }
+            def mix = { int[] a, int[] b, double t ->
+                [
+                        Math.round(a[0] * (1.0D - t) + b[0] * t) as int,
+                        Math.round(a[1] * (1.0D - t) + b[1] * t) as int,
+                        Math.round(a[2] * (1.0D - t) + b[2] * t) as int
+                ] as int[]
+            }
+
+            int[] coatDark = [48, 32, 29]
+            int[] coatMid = [78, 52, 45]
+            int[] coatLight = [112, 78, 63]
+            int[] coatHigh = [139, 101, 79]
+            int[] tan = [137, 103, 82]
+            int[] tanHigh = [165, 129, 101]
+            int[] maneDark = [24, 17, 17]
+            int[] maneMid = [39, 27, 25]
+            int[] maneHigh = [58, 40, 35]
+            int[] outline = [19, 14, 14]
+
+            for (int y = 0; y < 96; y++) {
+                for (int x = 0; x < 64; x++) {
+                    int argb = source.getRGB(x, y)
+                    int alpha = (argb >>> 24) & 0xff
+                    if (alpha == 0) {
+                        image.setRGB(x, y, 0)
+                        continue
+                    }
+                    int r = (argb >>> 16) & 0xff
+                    int g = (argb >>> 8) & 0xff
+                    int b = argb & 0xff
+                    double lum = 0.2126D * r + 0.7152D * g + 0.0722D * b
+                    int max = Math.max(r, Math.max(g, b))
+                    int min = Math.min(r, Math.min(g, b))
+                    int saturation = max - min
+
+                    int[] target
+                    if (lum < 28) {
+                        target = outline
+                    } else if (y < 36 && r > 85 && g > 70 && b < 85 && (r + g) > b * 2.2D) {
+                        target = lum > 115 ? ([119, 143, 73] as int[]) : ([82, 108, 57] as int[])
+                    } else if (y < 36 && lum > 122 && saturation < 95) {
+                        double t = Math.min(1.0D, Math.max(0.0D, (lum - 122.0D) / 100.0D))
+                        target = mix(tan, tanHigh, t)
+                    } else {
+                        double t = Math.min(1.0D, Math.max(0.0D, (lum - 35.0D) / 145.0D))
+                        target = t < 0.55D
+                                ? mix(coatDark, coatMid, t / 0.55D)
+                                : mix(coatMid, coatLight, (t - 0.55D) / 0.45D)
+                    }
+
+                    if (y >= 36 && y < 54) {
+                        double t = Math.min(1.0D, Math.max(0.0D, (lum - 20.0D) / 170.0D))
+                        target = t < 0.55D
+                                ? mix(maneDark, maneMid, t / 0.55D)
+                                : mix(maneMid, maneHigh, (t - 0.55D) / 0.45D)
+                    }
+
+                    if (x >= 32 && y >= 54 && y < 67) {
+                        double t = Math.min(1.0D, Math.max(0.0D, (lum - 20.0D) / 180.0D))
+                        target = t < 0.55D
+                                ? mix(coatDark, coatMid, t / 0.55D)
+                                : mix(coatMid, coatLight, (t - 0.55D) / 0.45D)
+                    }
+
+                    if (x < 44 && y >= 68) {
+                        int pattern = (((x / 3) as int) * 17 + ((y / 3) as int) * 31 + (x * y) % 11) % 23
+                        int delta = pattern <= 3 ? -7 : (pattern >= 10 && pattern <= 12 ? 5 : 0)
+                        if (((y - 68) % 18) < 4) delta -= 3
+                        target = [
+                                clampChannel(target[0] + delta),
+                                clampChannel(target[1] + ((delta / 2) as int)),
+                                clampChannel(target[2] + ((delta / 3) as int))
+                        ] as int[]
+                    }
+
+                    image.setRGB(x, y, rgb(target[0], target[1], target[2], alpha))
+                }
+            }
+
+            def paint = { int x0, int y0, int x1, int y1, int[] colour ->
+                for (int y = y0; y < y1; y++) {
+                    for (int x = x0; x < x1; x++) {
+                        image.setRGB(x, y, rgb(colour[0], colour[1], colour[2], 255))
+                    }
+                }
+            }
+
+            paint(48, 0, 56, 6, coatMid)
+            paint(50, 1, 54, 4, [50, 30, 29] as int[])
+            paint(56, 0, 64, 6, coatMid)
+            paint(58, 1, 62, 4, [50, 30, 29] as int[])
+
+            for (int y = 68; y < 87; y++) {
+                for (int x = 44; x < 64; x++) {
+                    int variation = ((x * 5 + y * 7) % 13) - 6
+                    image.setRGB(x, y, rgb(
+                            clampChannel(coatMid[0] + variation),
+                            clampChannel(coatMid[1] + ((variation / 2) as int)),
+                            clampChannel(coatMid[2] + ((variation / 2) as int)),
+                            255))
+                }
+            }
+            for (int y = 87; y < 95; y++) {
+                for (int x = 44; x < 60; x++) {
+                    int variation = ((x + y) % 5) - 2
+                    image.setRGB(x, y, rgb(
+                            clampChannel(maneMid[0] + variation),
+                            clampChannel(maneMid[1] + variation),
+                            clampChannel(maneMid[2] + variation),
+                            255))
+                }
+            }
+
+            javax.imageio.ImageIO.write(image, 'png', outputFile)
+        } finally {
+            zip.close()
+        }
+    }
+}
+
+sourceSets.main.resources.srcDir(generatedKovuResources)
+
+tasks.named('processResources') {
+    dependsOn tasks.named('generateKovuTexture')
+    // Keep the checked-in 0.0.3 PNG as an editable fallback/reference, but ship the generated
+    // high-detail texture instead.
+    exclude { details ->
+        details.file.canonicalFile == file('src/main/resources/assets/prideslegacy/textures/entity/kovu.png').canonicalFile
+    }
+}
