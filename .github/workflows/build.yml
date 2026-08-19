@@ -1,0 +1,66 @@
+name: Build
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.14.4'
+
+      - name: Download Circle of Craft dependency
+        shell: bash
+        run: |
+          mkdir -p libs
+          python3 - <<'PY'
+          import json
+          import urllib.parse
+          import urllib.request
+
+          params = urllib.parse.urlencode({
+              'game_versions': json.dumps(['1.21.1']),
+              'loaders': json.dumps(['neoforge']),
+          })
+          api = 'https://api.modrinth.com/v2/project/circle-of-craft/version?' + params
+          req = urllib.request.Request(api, headers={'User-Agent': 'PridesLegacy-GitHubActions/1.0'})
+          with urllib.request.urlopen(req) as response:
+              versions = json.load(response)
+
+          releases = [v for v in versions if v.get('version_type') == 'release'] or versions
+          if not releases:
+              raise SystemExit('No Circle of Craft 1.21.1 NeoForge version found on Modrinth')
+
+          version = releases[0]
+          files = version.get('files', [])
+          primary = next((f for f in files if f.get('primary')), files[0] if files else None)
+          if primary is None:
+              raise SystemExit('Circle of Craft version has no downloadable file')
+
+          print('Using Circle of Craft:', version.get('version_number'), primary.get('filename'))
+          urllib.request.urlretrieve(primary['url'], 'libs/circleofcraft.jar')
+          PY
+
+      - name: Build addon
+        run: gradle build --stacktrace
+
+      - name: Upload addon jar
+        uses: actions/upload-artifact@v4
+        with:
+          name: prideslegacy-dev
+          path: build/libs/*.jar
