@@ -1,6 +1,6 @@
 package com.jnizio.prideslegacy.entity;
 
-import io.github.ron1196.circleofcraft.entity.animal.GenderedAnimal;
+import io.github.ron1196.circleofcraft.entity.animal.Gender;
 import io.github.ron1196.circleofcraft.entity.animal.LionEntity;
 import javax.annotation.Nullable;
 import net.minecraft.network.chat.Component;
@@ -29,7 +29,7 @@ public class KovuEntity extends LionEntity {
         setCustomName(Component.literal("Kovu"));
         setCustomNameVisible(true);
         setPersistenceRequired();
-        setGender(GenderedAnimal.Gender.MALE);
+        setGender(Gender.MALE);
     }
 
     public static AttributeSupplier.Builder createAttributes() {
@@ -44,7 +44,7 @@ public class KovuEntity extends LionEntity {
             @NotNull MobSpawnType spawnType,
             @Nullable SpawnGroupData spawnData) {
         SpawnGroupData result = super.finalizeSpawn(level, difficulty, spawnType, spawnData);
-        setGender(GenderedAnimal.Gender.MALE);
+        setGender(Gender.MALE);
         return result;
     }
 }
